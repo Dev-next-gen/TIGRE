@@ -13,6 +13,7 @@ from tigre.utilities.Ax import Ax
 from tigre.utilities.im3Dnorm import im3DNORM
 from tigre.utilities.init_multigrid import init_multigrid
 from tigre.utilities.order_subsets import order_subsets
+from tigre.utilities.redundancy_weighting import redundancy_weighting
 from tigre.utilities.Measure_Quality import Measure_Quality as MQ
 from tigre.utilities.gpu import GpuIds
 
@@ -93,6 +94,13 @@ class IterativeReconAlg(object):
             OS_SART_TV
             FISTA
 
+    :keyword redundancy_weighting: (Boolean)
+        Applies Wang data redundancy weighting to the projection weight W
+        when the detector is offset along its fan direction, as MATLAB does.
+        Without it a half-fan scan counts its twice-covered region twice and
+        rings at the transition radius. A centred detector is unaffected.
+        default=True
+
     Usage
     --------
     >>> import numpy as np
@@ -153,6 +161,7 @@ class IterativeReconAlg(object):
             gpuids=None,
             niter_outer=4,
             restart=True,
+            redundancy_weighting=True,
         )
         allowed_keywords = [
             "V",
@@ -251,6 +260,10 @@ class IterativeReconAlg(object):
         W[W <= min(self.geo.dVoxel / 2)] = np.inf
         W = 1.0 / W
         W[W > 0.1] = 0.1
+        if self.redundancy_weighting:
+            # Data redundancy weighting for an offset detector, folded into W the
+            # same way MATLAB's OS_SART does it. A centred detector gives ones.
+            W = W * redundancy_weighting(self.geo)
         setattr(self, "W", W)
 
     def set_v(self):
